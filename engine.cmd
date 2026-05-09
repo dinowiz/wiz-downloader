@@ -1,0 +1,1 @@
+yt-dlp.exe --ignore-errors --format bestaudio --extract-audio --audio-format mp3 --audio-quality 320K --output "d:\m\music\youtube\%(title)s.%(ext)s" --yes-playlist --hls-prefer-native --embed-thumbnail --add-metadata --download-archive "d:\m\music\youtube\downloaded.txt" "https://www.youtube.com/playlist?list=PLS3F4z7eFMfLae4p5dWTlPtCEukbmLNAs"
