@@ -4,6 +4,7 @@ import subprocess
 import threading
 import os
 import sys
+import json
 
 # ─── Colour palette ────────────────────────────────────────────────────────────
 BG      = "#1e1e1e"
@@ -18,6 +19,15 @@ RED     = "#f44747"
 YELLOW  = "#dcdcaa"
 BLUE    = "#569cd6"
 GREEN   = "#4ec9b0"
+
+
+def _get_config_path() -> str:
+    """Return path to the persistent settings JSON file."""
+    if getattr(sys, 'frozen', False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, "wiz-downloader.json")
 
 
 def _setup_style():
@@ -113,6 +123,8 @@ class WizDownloader:
 
         _setup_style()
         self._build_ui()
+        self._load_settings()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Layout
@@ -266,7 +278,7 @@ class WizDownloader:
         self.o_embed_thumb  = tk.BooleanVar(value=True)
         self.o_embed_meta   = tk.BooleanVar(value=True)
         self.o_yes_playlist = tk.BooleanVar(value=True)
-        self.o_hls_native   = tk.BooleanVar(value=True)
+        self.o_hls_native   = tk.BooleanVar(value=False)
         self.o_no_overwrite = tk.BooleanVar(value=False)
         self.o_write_subs   = tk.BooleanVar(value=False)
         self.o_auto_subs    = tk.BooleanVar(value=False)
@@ -424,6 +436,105 @@ class WizDownloader:
         s = "normal" if self.o_archive.get() else "disabled"
         self.e_archive.config(state=s)
         self.b_archive.config(state=s)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Settings persistence
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _save_settings(self):
+        cfg = {
+            "urls":         self.w_urls.get("1.0", tk.END).rstrip("\n"),
+            "outdir":       self.v_outdir.get(),
+            "tmpl":         self.v_tmpl.get(),
+            "mode":         self.v_mode.get(),
+            "afmt":         self.v_afmt.get(),
+            "aqual":        self.v_aqual.get(),
+            "vqual":        self.v_vqual.get(),
+            "mfmt":         self.v_mfmt.get(),
+            "cfmt":         self.v_cfmt.get(),
+            "ignore_err":   self.o_ignore_err.get(),
+            "embed_thumb":  self.o_embed_thumb.get(),
+            "embed_meta":   self.o_embed_meta.get(),
+            "yes_playlist": self.o_yes_playlist.get(),
+            "hls_native":   self.o_hls_native.get(),
+            "no_overwrite": self.o_no_overwrite.get(),
+            "write_subs":   self.o_write_subs.get(),
+            "auto_subs":    self.o_auto_subs.get(),
+            "write_desc":   self.o_write_desc.get(),
+            "write_info":   self.o_write_info.get(),
+            "ratelimit":    self.o_ratelimit.get(),
+            "ratelimit_val":self.v_ratelimit.get(),
+            "retries":      self.v_retries.get(),
+            "concurrent":   self.v_concurrent.get(),
+            "sleep":        self.v_sleep.get(),
+            "cookies":      self.o_cookies.get(),
+            "browser":      self.v_browser.get(),
+            "proxy":        self.o_proxy.get(),
+            "proxy_val":    self.v_proxy.get(),
+            "archive":      self.o_archive.get(),
+            "archive_path": self.v_archive.get(),
+            "exe":          self.v_exe.get(),
+        }
+        try:
+            with open(_get_config_path(), "w", encoding="utf-8") as fh:
+                json.dump(cfg, fh, indent=2)
+        except OSError:
+            pass
+
+    def _load_settings(self):
+        try:
+            with open(_get_config_path(), encoding="utf-8") as fh:
+                cfg = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            return
+
+        def _s(key, var):
+            """Set a StringVar/BooleanVar if the key exists in cfg."""
+            if key in cfg:
+                var.set(cfg[key])
+
+        if "urls" in cfg:
+            self.w_urls.delete("1.0", tk.END)
+            self.w_urls.insert("1.0", cfg["urls"])
+
+        _s("outdir",       self.v_outdir)
+        _s("tmpl",         self.v_tmpl)
+        _s("mode",         self.v_mode)
+        _s("afmt",         self.v_afmt)
+        _s("aqual",        self.v_aqual)
+        _s("vqual",        self.v_vqual)
+        _s("mfmt",         self.v_mfmt)
+        _s("cfmt",         self.v_cfmt)
+        _s("ignore_err",   self.o_ignore_err)
+        _s("embed_thumb",  self.o_embed_thumb)
+        _s("embed_meta",   self.o_embed_meta)
+        _s("yes_playlist", self.o_yes_playlist)
+        _s("hls_native",   self.o_hls_native)
+        _s("no_overwrite", self.o_no_overwrite)
+        _s("write_subs",   self.o_write_subs)
+        _s("auto_subs",    self.o_auto_subs)
+        _s("write_desc",   self.o_write_desc)
+        _s("write_info",   self.o_write_info)
+        _s("ratelimit",    self.o_ratelimit)
+        _s("ratelimit_val",self.v_ratelimit)
+        _s("retries",      self.v_retries)
+        _s("concurrent",   self.v_concurrent)
+        _s("sleep",        self.v_sleep)
+        _s("cookies",      self.o_cookies)
+        _s("browser",      self.v_browser)
+        _s("proxy",        self.o_proxy)
+        _s("proxy_val",    self.v_proxy)
+        _s("archive",      self.o_archive)
+        _s("archive_path", self.v_archive)
+        _s("exe",          self.v_exe)
+
+        # Re-apply widget enable/disable states after loading
+        self._mode_changed()
+        self._archive_toggled()
+
+    def _on_close(self):
+        self._save_settings()
+        self.root.destroy()
 
     # ─────────────────────────────────────────────────────────────────────────
     # File / folder pickers
