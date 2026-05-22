@@ -1,5 +1,8 @@
 #misc
 .history
 
-# exe
-*.exe
+#remove ytdlp ffmpeg ffplay ffprobe from git tracking
+yt-dlp.exe
+ffmpeg.exe
+ffplay.exe
+ffprobe.exe
